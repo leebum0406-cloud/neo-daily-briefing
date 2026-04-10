@@ -8,23 +8,29 @@ from email.mime.text import MIMEText
 
 client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
-# 💡 키워드를 더 구체적이고 다양하게 수정했습니다.
+# 💡 운영기관 및 노선별로 키워드를 아주 구체적으로 분리했습니다.
 TOPICS = {
-    "AI/테크": "https://news.google.com/rss/search?q=인공지능+LLM+NVIDIA+OpenAI&hl=ko&gl=KR&ceid=KR:ko",
-    "국내 산업": "https://news.google.com/rss/search?q=반도체+HBM+K-배터리+현대차+실적&hl=ko&gl=KR&ceid=KR:ko",
-    "철도/교통": "https://news.google.com/rss/search?q=GTX+철도+지하철+현대로템+국가철도공단&hl=ko&gl=KR&ceid=KR:ko",
-    "해외 논문": "https://news.google.com/rss/search?q=AI+Research+Paper+Arxiv&hl=ko&gl=KR&ceid=KR:ko"
+    "AI/테크": "https://news.google.com/rss/search?q=인공지능+OpenAI+NVIDIA+LLM&hl=ko&gl=KR&ceid=KR:ko",
+    
+    # 🏢 주요 철도 운영기관 소식
+    "철도 운영사 동향": "https://news.google.com/rss/search?q=서울교통공사+OR+코레일+OR+한국철도공사+OR+신분당선+OR+네오트랜스+OR+9호선+OR+공항철도&hl=ko&gl=KR&ceid=KR:ko",
+    
+    # 🚈 도시철도 및 기술 구분 (경전철, 중전철 등)
+    "도시철도 및 경/중전철": "https://news.google.com/rss/search?q=경전철+OR+중전철+OR+우이신설선+OR+신림선+OR+지하철+연장+OR+트램&hl=ko&gl=KR&ceid=KR:ko",
+    
+    # 🚀 철도 신기술 및 정책
+    "철도 신사업/기술": "https://news.google.com/rss/search?q=철도지하화+OR+수소열차+OR+자율주행열차+OR+하이퍼튜브+OR+LTE-R&hl=ko&gl=KR&ceid=KR:ko",
+    
+    "해외 철도/논문": "https://news.google.com/rss/search?q=High-speed+rail+OR+Maglev+OR+AI+Research+Paper&hl=en&gl=US&ceid=US:en"
 }
 
 def get_news_from_rss(url):
     try:
-        # User-Agent를 설정하여 차단을 방지합니다.
         headers = {'User-Agent': 'Mozilla/5.0'}
-        response = requests.get(url, headers=headers)
+        response = requests.get(url, headers=headers, timeout=10)
         root = ET.fromstring(response.content)
         news_items = []
-        # 최신 뉴스 3개로 늘림
-        for item in root.findall('./channel/item')[:3]: 
+        for item in root.findall('./channel/item')[:4]: 
             news_items.append({
                 "title": item.find('title').text,
                 "link": item.find('link').text
@@ -35,22 +41,21 @@ def get_news_from_rss(url):
         return []
 
 def summarize_with_gpt(topic, news_list):
-    # 기사가 없을 경우를 위해 프롬프트를 강화
     if not news_list:
-        news_text = "최근 이슈가 수집되지 않았습니다."
+        news_text = f"{topic}에 대한 구체적인 뉴스가 수집되지 않았습니다. 현재 알려진 산업 동향을 요약해 주세요."
     else:
         news_text = "\n".join([f"- 제목: {n['title']}\n  링크: {n['link']}" for n in news_list])
     
     prompt = f"""
-    당신은 '{topic}' 분야 전문 뉴스레터 에디터입니다. 
-    수집된 뉴스 정보를 바탕으로 독자들에게 도움이 될 브리핑을 작성하세요.
+    당신은 대한민국 철도 산업 전문 분석가입니다. 
     
-    [작성 규칙]
-    1. 반드시 '제목, 요약, 쉬운설명, 관련분야, 중요도, 전체링크' 형식을 지키세요.
-    2. 기사가 없다면 해당 분야의 최근 일반적인 트렌드나 기술 동향을 바탕으로 '오늘의 인사이트'를 작성하세요. (절대 '내용 없음'으로 끝내지 마세요)
-    3. 말투는 친절하고 전문적인 톤으로 작성하세요.
+    [분석 대상 및 규칙]
+    1. '철도 운영사 동향': 서울교통공사, 코레일, 신분당선, 9호선, 공항철도 등 주요 운영사의 사건/사고, 경영 소식, 서비스 개선 내용을 집중적으로 분석하세요.
+    2. '도시철도 및 경/중전철': 경전철(U-LRT 등)과 중전철 노선의 신설, 연장, 노선별 특이사항을 다루세요.
+    3. '철도 신사업/기술': 신기술 도입 현황을 전문적으로 설명하세요.
+    4. 반드시 '제목, 요약, 쉬운설명, 관련분야, 중요도, 전체링크' 형식을 지키세요.
     
-    뉴스 정보:
+    데이터:
     {news_text}
     """
     
@@ -60,41 +65,36 @@ def summarize_with_gpt(topic, news_list):
     )
     return response.choices[0].message.content
 
+# ... (send_email 및 main 함수는 이전과 동일) ...
+
 def send_email(body):
     EMAIL_USER = os.environ.get('EMAIL_USER').strip()
     EMAIL_PASS = os.environ.get('EMAIL_PASS').strip()
     EMAIL_TO = os.environ.get('EMAIL_TO').strip()
-
     today = datetime.now().strftime('%Y년 %m월 %d일')
-    subject = f"🚀 [네오트랜스] 오늘의 핵심 AI & 산업 브리핑 - {today}"
-    
-    # 더 이쁘게 보이기 위해 구분선 추가
+    subject = f"🚅 [네오트랜스] 운영사 및 노선별 정밀 철도 브리핑 - {today}"
     msg = MIMEText(body, 'plain', 'utf-8')
     msg['Subject'] = subject
     msg['From'] = EMAIL_USER
     msg['To'] = EMAIL_TO
-
     with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
         server.login(EMAIL_USER, EMAIL_PASS)
         server.send_message(msg)
 
 def main():
-    print(f"[{datetime.now()}] 브리핑 생성 시작...")
-    final_report = f"🤖 네오트랜스 AI & 산업 데일리 브리핑\n"
-    final_report += f"발송일: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+    print(f"[{datetime.now()}] 정밀 철도 브리핑 생성 시작...")
+    final_report = f"📬 네오트랜스 통합 철도 전문 브리핑\n"
+    final_report += f"기준 일시: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
     final_report += "==================================================\n\n"
-    
     for topic, url in TOPICS.items():
-        print(f"{topic} 처리 중...")
+        print(f"[{topic}] 심층 분석 중...")
         news_list = get_news_from_rss(url)
         summary = summarize_with_gpt(topic, news_list)
         final_report += summary + "\n\n"
-        
     final_report += "==================================================\n"
-    final_report += "※ 본 메일은 AI가 실시간 데이터를 분석하여 자동 생성하였습니다."
-    
+    final_report += "※ 이 보고서는 주요 철도 운영사 데이터를 기반으로 작성되었습니다."
     send_email(final_report)
-    print("브리핑 발송 완료!")
+    print("성공적으로 발송되었습니다!")
 
 if __name__ == "__main__":
     main()

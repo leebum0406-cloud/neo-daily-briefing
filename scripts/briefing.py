@@ -1,100 +1,105 @@
 import os
 import requests
-import xml.etree.ElementTree as ET
+from bs4 import BeautifulSoup
 from datetime import datetime
 from openai import OpenAI
 import smtplib
 from email.mime.text import MIMEText
+import xml.etree.ElementTree as ET
 
 client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
-# 💡 운영기관 및 노선별로 키워드를 아주 구체적으로 분리했습니다.
-TOPICS = {
-    "AI/테크": "https://news.google.com/rss/search?q=인공지능+OpenAI+NVIDIA+LLM&hl=ko&gl=KR&ceid=KR:ko",
-    
-    # 🏢 주요 철도 운영기관 소식
-    "철도 운영사 동향": "https://news.google.com/rss/search?q=서울교통공사+OR+코레일+OR+한국철도공사+OR+신분당선+OR+네오트랜스+OR+9호선+OR+공항철도&hl=ko&gl=KR&ceid=KR:ko",
-    
-    # 🚈 도시철도 및 기술 구분 (경전철, 중전철 등)
-    "도시철도 및 경/중전철": "https://news.google.com/rss/search?q=경전철+OR+중전철+OR+우이신설선+OR+신림선+OR+지하철+연장+OR+트램&hl=ko&gl=KR&ceid=KR:ko",
-    
-    # 🚀 철도 신기술 및 정책
-    "철도 신사업/기술": "https://news.google.com/rss/search?q=철도지하화+OR+수소열차+OR+자율주행열차+OR+하이퍼튜브+OR+LTE-R&hl=ko&gl=KR&ceid=KR:ko",
-    
-    "해외 철도/논문": "https://news.google.com/rss/search?q=High-speed+rail+OR+Maglev+OR+AI+Research+Paper&hl=en&gl=US&ceid=US:en"
-}
-
-def get_news_from_rss(url):
+def get_redaily_news():
+    """철도경제(redaily.co.kr) 최신 뉴스 크롤링"""
+    url = "https://www.redaily.co.kr/news/articleList.html?view_type=sm"
+    headers = {'User-Agent': 'Mozilla/5.0'}
+    items = []
     try:
-        headers = {'User-Agent': 'Mozilla/5.0'}
-        response = requests.get(url, headers=headers, timeout=10)
-        root = ET.fromstring(response.content)
-        news_items = []
-        for item in root.findall('./channel/item')[:4]: 
-            news_items.append({
+        res = requests.get(url, headers=headers, timeout=10)
+        soup = BeautifulSoup(res.text, 'html.parser')
+        for a in soup.select('.list-titles a')[:5]:
+            items.append({"title": a.get_text(strip=True), "link": "https://www.redaily.co.kr" + a['href']})
+    except: pass
+    return items
+
+def get_rss_news(url, limit=5):
+    """RSS 피드를 제공하는 전문지(AI타임스, 전자신문 등)용 함수"""
+    headers = {'User-Agent': 'Mozilla/5.0'}
+    items = []
+    try:
+        res = requests.get(url, headers=headers, timeout=10)
+        root = ET.fromstring(res.content)
+        for item in root.findall('./channel/item')[:limit]:
+            items.append({
                 "title": item.find('title').text,
                 "link": item.find('link').text
             })
-        return news_items
-    except Exception as e:
-        print(f"RSS 수집 오류: {e}")
-        return []
+    except: pass
+    return items
 
 def summarize_with_gpt(topic, news_list):
+    """전문가 톤으로 요약하는 GPT 엔진"""
     if not news_list:
-        news_text = f"{topic}에 대한 구체적인 뉴스가 수집되지 않았습니다. 현재 알려진 산업 동향을 요약해 주세요."
+        news_text = "현재 수집된 기사가 없습니다. 해당 분야의 최신 트렌드를 바탕으로 인사이트를 작성하세요."
     else:
-        news_text = "\n".join([f"- 제목: {n['title']}\n  링크: {n['link']}" for n in news_list])
+        news_text = "\n".join([f"- {n['title']} ({n['link']})" for n in news_list])
     
     prompt = f"""
-    당신은 대한민국 철도 산업 전문 분석가입니다. 
+    당신은 '{topic}' 분야의 수석 애널리스트입니다. 
+    제공된 전문지의 정보를 바탕으로 '네오트랜스' 임직원들이 읽을 고품격 뉴스레터를 작성하세요.
     
-    [분석 대상 및 규칙]
-    1. '철도 운영사 동향': 서울교통공사, 코레일, 신분당선, 9호선, 공항철도 등 주요 운영사의 사건/사고, 경영 소식, 서비스 개선 내용을 집중적으로 분석하세요.
-    2. '도시철도 및 경/중전철': 경전철(U-LRT 등)과 중전철 노선의 신설, 연장, 노선별 특이사항을 다루세요.
-    3. '철도 신사업/기술': 신기술 도입 현황을 전문적으로 설명하세요.
-    4. 반드시 '제목, 요약, 쉬운설명, 관련분야, 중요도, 전체링크' 형식을 지키세요.
+    [형식]
+    제목, 요약, 쉬운설명, 관련분야, 중요도, 전체링크
     
-    데이터:
-    {news_text}
+    특히 '철도' 섹션은 신분당선, 코레일, 서교공 소식 및 신기술 위주로 작성하고, 
+    'AI'와 '산업' 섹션은 실무에 적용 가능한 기술 트렌드 위주로 분석하세요.
     """
     
     response = client.chat.completions.create(
-        model="gpt-4o", 
-        messages=[{"role": "user", "content": prompt}]
+        model="gpt-4o",
+        messages=[{"role": "system", "content": "너는 철도와 IT에 정통한 전문 에디터야."},
+                  {"role": "user", "content": f"{news_text}\n\n위 데이터를 기반으로 작성해줘."}]
     )
     return response.choices[0].message.content
 
-# ... (send_email 및 main 함수는 이전과 동일) ...
+def main():
+    print(f"[{datetime.now()}] 전문지 통합 브리핑 생성 시작...")
+    
+    # 1. 분야별 뉴스 수집 (각 전문지 RSS 및 크롤링 주소)
+    sources = {
+        "🚀 철도 전문 분석 (철도경제)": get_redaily_news(),
+        "🤖 AI/테크 심층 분석 (AI타임스)": get_rss_news("http://www.aitimes.com/rss/allNews.xml"),
+        "🏭 국내 산업/IT 동향 (전자신문)": get_rss_news("https://www.etnews.com/etnews/rss/all.xml"),
+        "🔬 글로벌 테크/논문": get_rss_news("https://news.google.com/rss/search?q=AI+Research+Paper&hl=en&gl=US&ceid=US:en")
+    }
+    
+    final_report = f"📬 네오트랜스 전문지 통합 브리핑 ({datetime.now().strftime('%Y-%m-%d')})\n"
+    final_report += "==================================================\n\n"
+    
+    for topic, news_list in sources.items():
+        print(f"{topic} 분석 중...")
+        summary = summarize_with_gpt(topic, news_list)
+        final_report += f"## {topic}\n{summary}\n\n---\n\n"
+        
+    final_report += "※ 본 보고서는 철도경제, AI타임스, 전자신문 등 전문 매체 데이터를 기반으로 작성되었습니다."
+    
+    # 이메일 발송
+    send_email(final_report)
 
 def send_email(body):
     EMAIL_USER = os.environ.get('EMAIL_USER').strip()
     EMAIL_PASS = os.environ.get('EMAIL_PASS').strip()
     EMAIL_TO = os.environ.get('EMAIL_TO').strip()
-    today = datetime.now().strftime('%Y년 %m월 %d일')
-    subject = f"🚅 [네오트랜스] 운영사 및 노선별 정밀 철도 브리핑 - {today}"
+    
     msg = MIMEText(body, 'plain', 'utf-8')
-    msg['Subject'] = subject
+    msg['Subject'] = f"🚅 [네오트랜스] 전문지 통합 산업 브리핑 - {datetime.now().strftime('%m월 %d일')}"
     msg['From'] = EMAIL_USER
     msg['To'] = EMAIL_TO
+    
     with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
         server.login(EMAIL_USER, EMAIL_PASS)
         server.send_message(msg)
-
-def main():
-    print(f"[{datetime.now()}] 정밀 철도 브리핑 생성 시작...")
-    final_report = f"📬 네오트랜스 통합 철도 전문 브리핑\n"
-    final_report += f"기준 일시: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
-    final_report += "==================================================\n\n"
-    for topic, url in TOPICS.items():
-        print(f"[{topic}] 심층 분석 중...")
-        news_list = get_news_from_rss(url)
-        summary = summarize_with_gpt(topic, news_list)
-        final_report += summary + "\n\n"
-    final_report += "==================================================\n"
-    final_report += "※ 이 보고서는 주요 철도 운영사 데이터를 기반으로 작성되었습니다."
-    send_email(final_report)
-    print("성공적으로 발송되었습니다!")
+    print("브리핑 발송 완료!")
 
 if __name__ == "__main__":
     main()

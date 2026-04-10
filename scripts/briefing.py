@@ -8,36 +8,15 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+NAVER_CLIENT_ID = os.environ.get("NAVER_CLIENT_ID")
+NAVER_CLIENT_SECRET = os.environ.get("NAVER_CLIENT_SECRET")
 
-# ✅ 한국 주요 언론사 + 철도 전문 RSS
-RSS_FEEDS = {
-    "🚇 철도/교통 정책": [
-        "https://www.yna.co.kr/RSS/society.xml",
-        "https://rss.donga.com/society.xml",
-        "https://www.hani.co.kr/rss/society/",
-        "https://rss.joins.com/joins_news_list.xml",
-        "https://www.newsis.com/RSS/society.xml",
-    ],
-    "🏢 국내 경제/산업": [
-        "https://www.hankyung.com/feed/economy",
-        "https://rss.mk.co.kr/rss/30000001.xml",
-        "https://www.sedaily.com/RSS/sed_economy.xml",
-        "https://www.etnews.com/rss/",
-        "https://biz.chosun.com/arc/outboundfeeds/rss/?outputType=xml",
-    ],
-    "🤖 AI/테크": [
-        "https://www.aitimes.com/rss/allArticle.xml",
-        "https://www.etnews.com/rss/",
-        "https://techcrunch.com/feed/",
-        "https://www.technologyreview.com/feed/",
-        "https://venturebeat.com/category/ai/feed/",
-    ],
-    "🌏 글로벌 철도/교통": [
-        "https://www.railwaygazette.com/feed/",
-        "https://www.globalrailwayreview.com/feed/",
-        "https://www.railjournal.com/feed/",
-        "https://www.intelligent-transport.com/feed/",
-    ],
+# 검색 키워드 설정
+SEARCH_TOPICS = {
+    "🚇 철도/교통 정책": ["철도 정책", "GTX 개통", "지하철 노선", "신분당선", "철도 안전"],
+    "🏢 국내 경제/산업": ["한국 경제", "산업 동향", "수출 무역", "제조업", "반도체 산업"],
+    "🤖 AI/테크": ["인공지능 AI", "챗GPT", "AI 로봇", "딥러닝", "AI 반도체"],
+    "🌏 글로벌 철도": ["해외 철도", "고속철도", "철도 기술", "자율주행 열차"],
 }
 
 PAPER_FEEDS = [
@@ -46,28 +25,35 @@ PAPER_FEEDS = [
     "https://export.arxiv.org/rss/eess.SY",
 ]
 
-def fetch_rss(feeds, count=6):
+def search_naver_news(keyword, display=3):
+    """네이버 뉴스 검색 API로 최신 뉴스 가져오기"""
+    url = "https://openapi.naver.com/v1/search/news.json"
+    headers = {
+        "X-Naver-Client-Id": NAVER_CLIENT_ID,
+        "X-Naver-Client-Secret": NAVER_CLIENT_SECRET,
+    }
+    params = {
+        "query": keyword,
+        "display": display,
+        "sort": "date",  # 최신순
+    }
     items = []
-    for url in feeds:
-        try:
-            headers = {'User-Agent': 'Mozilla/5.0'}
-            feed = feedparser.parse(url, request_headers=headers)
-            for entry in feed.entries[:3]:
-                title = entry.get("title", "").strip()
-                link = entry.get("link", "").strip()
-                summary = ""
-                if hasattr(entry, "summary"):
-                    from bs4 import BeautifulSoup
-                    summary = BeautifulSoup(entry.summary, "html.parser").get_text()[:400].strip()
-                if title and link:
-                    items.append({
-                        "title": title,
-                        "link": link,
-                        "summary": summary
-                    })
-        except Exception as e:
-            print(f"RSS 오류 ({url}): {e}")
-    return items[:count]
+    try:
+        res = requests.get(url, headers=headers, params=params, timeout=10)
+        data = res.json()
+        for item in data.get("items", []):
+            # HTML 태그 제거
+            title = item["title"].replace("<b>", "").replace("</b>", "").replace("&quot;", '"')
+            desc = item["description"].replace("<b>", "").replace("</b>", "").replace("&quot;", '"')
+            items.append({
+                "title": title,
+                "link": item["originallink"] or item["link"],
+                "summary": desc,
+                "pubDate": item.get("pubDate", "")
+            })
+    except Exception as e:
+        print(f"네이버 API 오류 ({keyword}): {e}")
+    return items
 
 def fetch_papers(count=4):
     items = []
@@ -120,7 +106,7 @@ def summarize_section(topic, news_list, is_paper=False):
 
 각 뉴스마다 반드시 아래 형식으로 빠짐없이 작성하세요:
 
-📌 제목: [뉴스 제목 (영문이면 한국어로 번역)]
+📌 제목: [뉴스 제목]
 - 핵심 내용: (무슨 일이 있었는지 3문장으로 구체적으로 서술)
 - 배경: (왜 이 뉴스가 나왔는지 1문장)
 - 우리 업계 시사점: (철도/교통/AI 분야에서의 의미 1문장)
@@ -184,11 +170,22 @@ def main():
 
 """
 
-    for topic, feeds in RSS_FEEDS.items():
+    for topic, keywords in SEARCH_TOPICS.items():
         print(f"  {topic} 수집 중...")
-        news = fetch_rss(feeds, count=6)
-        print(f"  → {len(news)}개 수집됨")
-        summary = summarize_section(topic, news, is_paper=False)
+        all_news = []
+        for keyword in keywords:
+            news = search_naver_news(keyword, display=3)
+            all_news.extend(news)
+        # 중복 제거
+        seen = set()
+        unique_news = []
+        for n in all_news:
+            if n['title'] not in seen:
+                seen.add(n['title'])
+                unique_news.append(n)
+        unique_news = unique_news[:6]
+        print(f"  → {len(unique_news)}개 수집됨")
+        summary = summarize_section(topic, unique_news, is_paper=False)
         report += f"{'='*60}\n{topic}\n{'='*60}\n\n{summary}\n\n"
 
     print("  📚 논문 수집 중...")
@@ -205,7 +202,7 @@ def main():
 {top3}
 
 {'='*60}
-※ 본 메일은 주요 언론사 RSS 및 논문 데이터를 기반으로 AI가 자동 생성하였습니다.
+※ 본 메일은 네이버 뉴스 API 및 논문 데이터를 기반으로 AI가 자동 생성하였습니다.
 ※ 각 뉴스의 원문 링크를 클릭하여 상세 내용을 확인하시기 바랍니다.
 """
 

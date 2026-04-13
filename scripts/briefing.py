@@ -2,7 +2,7 @@ import os
 import requests
 import feedparser
 import json
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from openai import OpenAI
 import smtplib
 from email.mime.text import MIMEText
@@ -226,7 +226,8 @@ def send_email(subject, body):
 # 메인
 # ────────────────────────────────────────────────────────────
 def main():
-    now           = datetime.now()
+    KST = timezone(timedelta(hours=9))
+    now           = datetime.now(KST)
     today         = now.strftime("%Y-%m-%d")
     today_display = now.strftime("%Y년 %m월 %d일")
     dashboard_items = []

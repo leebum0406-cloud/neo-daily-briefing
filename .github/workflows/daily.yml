@@ -1,25 +1,20 @@
 name: Daily Briefing Automation
-
 on:
   schedule:
     - cron: '0 22 * * *' # 한국 시간 오전 7시
   workflow_dispatch:
-
 jobs:
   briefing:
     runs-on: ubuntu-latest
     steps:
       - name: 저장소 체크아웃
         uses: actions/checkout@v3
-
       - name: Python 설치
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
-
       - name: 라이브러리 설치
         run: pip install requests beautifulsoup4 openai feedparser
-
       - name: 브리핑 실행
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -29,11 +24,10 @@ jobs:
           NAVER_CLIENT_ID: ${{ secrets.NAVER_CLIENT_ID }}
           NAVER_CLIENT_SECRET: ${{ secrets.NAVER_CLIENT_SECRET }}
         run: python scripts/briefing.py
-
       - name: 결과 데이터 커밋 및 푸시
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add data/news.json
+          git add data/
           git commit -m "뉴스 데이터 업데이트 - $(date +'%Y-%m-%d')" || echo "변경 사항 없음"
           git push

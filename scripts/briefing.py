@@ -87,10 +87,12 @@ def send_email(subject, body):
         server.send_message(msg)
 
 def main():
-    today = datetime.now().strftime('%Y년 %m월 %d일')
-    dashboard_items = [] # 대시보드 저장용
+    now = datetime.now()
+    today = now.strftime("%Y-%m-%d")
+    today_display = now.strftime("%Y년 %m월 %d일")
+    dashboard_items = []
 
-    final_report = f"🌤️ {today} 네오트랜스 아침 브리핑\n\n"
+    final_report = f"🌤️ {today_display} 네오트랜스 아침 브리핑\n\n"
 
     # 뉴스 섹션 처리
     for topic, keywords in SEARCH_TOPICS.items():
@@ -109,18 +111,40 @@ def main():
     final_report += f"### 📚 최신 논문\n{p_summary}"
     dashboard_items.append({"topic": "📚 최신 논문", "content": p_summary})
 
-    # 1. JSON 데이터 저장 (대시보드용)
+    # ── 데이터 저장 ──────────────────────────────────────────
     os.makedirs("data", exist_ok=True)
+
     output = {
-        "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "updated_at": now.strftime("%Y-%m-%d %H:%M"),
+        "date": today,
         "report": dashboard_items
     }
+
+    # 1. 날짜별 파일 저장 (누적)
+    with open(f"data/{today}.json", "w", encoding="utf-8") as f:
+        json.dump(output, f, ensure_ascii=False, indent=2)
+
+    # 2. 대시보드용 최신 파일 (항상 오늘 내용)
     with open("data/news.json", "w", encoding="utf-8") as f:
         json.dump(output, f, ensure_ascii=False, indent=2)
 
-    # 2. 이메일 발송
-    send_email(f"🚅 [네오트랜스] 브리핑 ({datetime.now().strftime('%m/%d')})", final_report)
-    print("✅ 모든 작업 완료 (JSON 저장 및 이메일 발송)")
+    # 3. 날짜 인덱스 파일 업데이트
+    index_path = "data/index.json"
+    existing_dates = []
+    if os.path.exists(index_path):
+        with open(index_path, "r", encoding="utf-8") as f:
+            existing_dates = json.load(f)
+
+    if today not in existing_dates:
+        existing_dates.insert(0, today)  # 최신 날짜가 맨 앞
+
+    with open(index_path, "w", encoding="utf-8") as f:
+        json.dump(existing_dates, f, ensure_ascii=False, indent=2)
+    # ─────────────────────────────────────────────────────────
+
+    # 이메일 발송
+    send_email(f"🚅 [네오트랜스] 브리핑 ({now.strftime('%m/%d')})", final_report)
+    print(f"✅ 완료 - {today}.json 저장 및 이메일 발송")
 
 if __name__ == "__main__":
     main()

@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>네오트랜스 Daily Briefing</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<style>
+  :root {
+    --bg: #0c0e14;
+    --surface: #13161f;
+    --surface2: #1a1e2a;
+    --border: rgba(255,255,255,0.07);
+    --border2: rgba(255,255,255,0.13);
+    --text: #e8eaf0;
+    --muted: #6b7280;
+    --accent-rail: #3b82f6;
+    --accent-econ: #f59e0b;
+    --accent-ai: #a78bfa;
+    --accent-global: #34d399;
+    --accent-paper: #f87171;
+    --font: 'Noto Sans KR', sans-serif;
+    --mono: 'DM Mono', monospace;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .topnav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(12, 14, 20, 0.85);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    padding: 0 2rem;
+    display: flex; align-items: center; justify-content: space-between;
+    height: 56px; gap: 12px;
+  }
+
+  .logo {
+    display: flex; align-items: center; gap: 10px;
+    font-weight: 700; font-size: 15px;
+    letter-spacing: -0.02em; white-space: nowrap;
+  }
+
+  .logo-icon {
+    width: 28px; height: 28px;
+    background: linear-gradient(135deg, #3b82f6, #a78bfa);
+    border-radius: 7px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; flex-shrink: 0;
+  }
+
+  .nav-right { display: flex; align-items: center; gap: 10px; }
+
+  .date-selector {
+    display: flex; align-items: center; gap: 6px;
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    border-radius: 8px; padding: 5px 10px;
+    font-family: var(--mono); font-size: 12px; color: var(--text);
+  }
+
+  .date-selector select {
+    background: transparent; border: none; outline: none;
+    color: var(--text); font-family: var(--mono);
+    font-size: 12px; cursor: pointer; max-width: 140px;
+  }
+
+  .date-selector select option { background: #1a1e2a; color: var(--text); }
+
+  .update-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--surface2); border: 1px solid var(--border2);
+    border-radius: 20px; padding: 4px 12px;
+    font-size: 11px; color: var(--muted);
+    font-family: var(--mono); white-space: nowrap;
+  }
+
+  .pulse {
+    width: 6px; height: 6px; background: #34d399;
+    border-radius: 50%; animation: pulse 2s infinite; flex-shrink: 0;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.8); }
+  }
+
+  .container {
+    max-width: 1200px; margin: 0 auto; padding: 2rem;
+    position: relative; z-index: 1;
+  }
+
+  .tabs { display: flex; gap: 6px; margin-bottom: 2rem; flex-wrap: wrap; }
+
+  .tab {
+    padding: 7px 16px; border-radius: 6px; font-size: 13px;
+    font-weight: 400; cursor: pointer;
+    border: 1px solid var(--border2); background: var(--surface);
+    color: var(--muted); transition: all 0.18s; font-family: var(--font);
+  }
+
+  .tab:hover { border-color: rgba(255,255,255,0.2); color: var(--text); }
+  .tab.active { color: #fff; font-weight: 500; border-color: transparent; }
+  .tab[data-cat="all"].active { background: rgba(255,255,255,0.1); }
+  .tab[data-cat="rail"].active { background: var(--accent-rail); }
+  .tab[data-cat="econ"].active { background: var(--accent-econ); }
+  .tab[data-cat="ai"].active { background: var(--accent-ai); }
+  .tab[data-cat="global"].active { background: var(--accent-global); color: #0c0e14; }
+  .tab[data-cat="paper"].active { background: var(--accent-paper); }
+
+  .stats {
+    display: grid; grid-template-columns: repeat(5, minmax(0,1fr));
+    gap: 10px; margin-bottom: 2rem;
+  }
+
+  .stat {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px 16px; transition: border-color 0.2s;
+  }
+
+  .stat:hover { border-color: var(--border2); }
+
+  .stat-label {
+    font-size: 11px; color: var(--muted); margin-bottom: 6px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+
+  .stat-num { font-family: var(--mono); font-size: 22px; font-weight: 500; }
+  .stat-num.rail { color: var(--accent-rail); }
+  .stat-num.econ { color: var(--accent-econ); }
+  .stat-num.ai { color: var(--accent-ai); }
+  .stat-num.global { color: var(--accent-global); }
+  .stat-num.paper { color: var(--accent-paper); }
+
+  .panels { display: flex; flex-direction: column; gap: 16px; }
+
+  .panel {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; overflow: hidden; animation: fadeIn 0.3s ease;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .panel-header {
+    display: flex; align-items: center; gap: 12px;
+    padding: 16px 20px; border-bottom: 1px solid var(--border);
+    cursor: pointer; user-select: none; transition: background 0.15s;
+  }
+
+  .panel-header:hover { background: var(--surface2); }
+  .cat-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .panel-title { font-size: 14px; font-weight: 500; flex: 1; }
+
+  .panel-toggle {
+    font-size: 12px; color: var(--muted);
+    font-family: var(--mono); transition: transform 0.2s;
+  }
+
+  .panel.collapsed .panel-toggle { transform: rotate(-90deg); }
+
+  .panel-body {
+    padding: 20px; overflow: hidden;
+    transition: max-height 0.3s ease, padding 0.3s ease;
+  }
+
+  .panel.collapsed .panel-body {
+    max-height: 0 !important; padding-top: 0; padding-bottom: 0;
+  }
+
+  .md-content { line-height: 1.8; }
+
+  .md-content h1, .md-content h2, .md-content h3 {
+    font-size: 14px; font-weight: 600;
+    margin: 1.4em 0 0.5em; padding-bottom: 6px;
+    border-bottom: 1px solid var(--border); color: var(--text);
+  }
+
+  .md-content h1:first-child,
+  .md-content h2:first-child,
+  .md-content h3:first-child { margin-top: 0; }
+
+  .md-content p { color: #9ca3af; margin-bottom: 0.8em; font-size: 13.5px; }
+  .md-content ul, .md-content ol { padding-left: 1.4em; margin-bottom: 0.8em; }
+  .md-content li { color: #9ca3af; font-size: 13.5px; margin-bottom: 0.3em; }
+
+  .md-content a {
+    color: #60a5fa; text-decoration: none;
+    font-family: var(--mono); font-size: 12px; word-break: break-all;
+  }
+
+  .md-content a:hover { text-decoration: underline; }
+  .md-content strong { color: var(--text); font-weight: 500; }
+  .md-content hr { border: none; border-top: 1px solid var(--border); margin: 1.2em 0; }
+
+  .md-content blockquote {
+    border-left: 3px solid var(--border2);
+    padding-left: 12px; color: var(--muted); font-style: italic;
+  }
+
+  .md-content code {
+    background: var(--surface2); padding: 1px 5px;
+    border-radius: 3px; font-family: var(--mono); font-size: 12px;
+  }
+
+  .loading { text-align: center; padding: 4rem 2rem; color: var(--muted); }
+
+  .loading-spinner {
+    width: 32px; height: 32px;
+    border: 2px solid var(--border2); border-top-color: var(--accent-rail);
+    border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 1rem;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .error-box {
+    background: rgba(248, 113, 113, 0.08);
+    border: 1px solid rgba(248,113,113,0.2);
+    border-radius: 10px; padding: 1.5rem;
+    color: #f87171; text-align: center;
+    font-family: var(--mono); font-size: 13px;
+  }
+
+  @media (max-width: 640px) {
+    .container { padding: 1rem; }
+    .stats { grid-template-columns: repeat(3, minmax(0,1fr)); }
+    .stats .stat:nth-child(4), .stats .stat:nth-child(5) { display: none; }
+    .topnav { padding: 0 1rem; }
+    .update-badge { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<nav class="topnav">
+  <div class="logo">
+    <div class="logo-icon">🚅</div>
+    네오트랜스 브리핑
+  </div>
+  <div class="nav-right">
+    <div class="date-selector">
+      📅 <select id="date-select"><option>로딩 중...</option></select>
+    </div>
+    <div class="update-badge">
+      <div class="pulse"></div>
+      <span id="update-time">로딩 중...</span>
+    </div>
+  </div>
+</nav>
+
+<div class="container">
+  <div class="tabs" id="tabs">
+    <button class="tab active" data-cat="all">전체</button>
+    <button class="tab" data-cat="rail">🚇 철도/교통정책</button>
+    <button class="tab" data-cat="global">🌏 글로벌철도</button>
+    <button class="tab" data-cat="econ">🏢 국내 경제/산업</button>
+    <button class="tab" data-cat="ai">🤖 AI/테크</button>
+    <button class="tab" data-cat="paper">📚 최신논문</button>
+  </div>
+  <div class="stats" id="stats"></div>
+  <div id="content">
+    <div class="loading"><div class="loading-spinner"></div>데이터를 불러오는 중...</div>
+  </div>
+</div>
+
+<script>
+const CAT_MAP = [
+  { key: "rail",   match: ["철도/교통", "철도 정책", "교통"],  label: "🚇 철도/교통 정책", color: "#3b82f6" },
+  { key: "global", match: ["글로벌"],                          label: "🌏 글로벌 철도",    color: "#34d399" },
+  { key: "econ",   match: ["경제", "산업"],                    label: "🏢 국내 경제/산업", color: "#f59e0b" },
+  { key: "ai",     match: ["AI", "테크", "인공지능"],          label: "🤖 AI/테크",        color: "#a78bfa" },
+  { key: "paper",  match: ["논문"],                            label: "📚 최신 논문",       color: "#f87171" },
+];
+
+function getCat(topic) {
+  for (const c of CAT_MAP) {
+    if (c.match.some(m => topic.includes(m))) return c;
+  }
+  return { key: "ai", color: "#a78bfa", label: topic };
+}
+
+let allData = [];
+let activeTab = "all";
+
+async function initDateSelector() {
+  const sel = document.getElementById("date-select");
+  try {
+    const res = await fetch('./data/index.json?t=' + Date.now());
+    if (!res.ok) throw new Error();
+    const dates = await res.json();
+
+    sel.innerHTML = dates.map((d, i) =>
+      `<option value="${d}">${d}${i === 0 ? ' (최신)' : ''}</option>`
+    ).join('');
+
+    sel.addEventListener("change", () => loadData(sel.value));
+    await loadData(dates[0]);
+  } catch {
+    sel.innerHTML = '<option value="news">오늘</option>';
+    await loadData(null);
+  }
+}
+
+async function loadData(date) {
+  document.getElementById("content").innerHTML =
+    `<div class="loading"><div class="loading-spinner"></div>불러오는 중...</div>`;
+  document.getElementById("stats").innerHTML = "";
+
+  const url = (date && date !== "news")
+    ? `./data/${date}.json?t=` + Date.now()
+    : `./data/news.json?t=` + Date.now();
+
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const json = await res.json();
+
+    document.getElementById("update-time").textContent = "업데이트: " + (json.updated_at || "알 수 없음");
+
+    allData = (json.report || []).map(item => ({
+      ...item, cat: getCat(item.topic)
+    }));
+
+    renderStats();
+    renderPanels();
+  } catch (e) {
+    document.getElementById("content").innerHTML = `
+      <div class="error-box">
+        ⚠ 데이터를 불러오지 못했습니다<br><br>
+        <small>${e.message}</small><br><br>
+        <small style="color:#6b7280">GitHub Actions 가 한 번 이상 실행된 뒤에 표시됩니다</small>
+      </div>`;
+    document.getElementById("update-time").textContent = "데이터 없음";
+    document.getElementById("stats").innerHTML = "";
+  }
+}
+
+function renderStats() {
+  document.getElementById("stats").innerHTML = CAT_MAP.map(c => {
+    const count = allData.filter(d => d.cat.key === c.key).length;
+    return `<div class="stat">
+      <div class="stat-label">${c.label}</div>
+      <div class="stat-num ${c.key}">${count}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderPanels() {
+  const filtered = activeTab === "all"
+    ? allData
+    : allData.filter(d => d.cat.key === activeTab);
+
+  if (filtered.length === 0) {
+    document.getElementById("content").innerHTML =
+      `<div class="loading" style="padding:3rem">해당 카테고리에 데이터가 없습니다</div>`;
+    return;
+  }
+
+  document.getElementById("content").innerHTML = `<div class="panels">${
+    filtered.map((item, i) => `
+      <div class="panel" id="panel-${i}">
+        <div class="panel-header" onclick="togglePanel(${i})">
+          <div class="cat-dot" style="background:${item.cat.color}"></div>
+          <div class="panel-title">${item.topic}</div>
+          <div class="panel-toggle">▾</div>
+        </div>
+        <div class="panel-body" id="body-${i}">
+          <div class="md-content">${marked.parse(item.content || '')}</div>
+        </div>
+      </div>`).join('')
+  }</div>`;
+
+  filtered.forEach((_, i) => {
+    const body = document.getElementById("body-" + i);
+    if (body) body.style.maxHeight = body.scrollHeight + "px";
+  });
+}
+
+function togglePanel(i) {
+  const panel = document.getElementById("panel-" + i);
+  const body = document.getElementById("body-" + i);
+  if (!panel || !body) return;
+  if (panel.classList.contains("collapsed")) {
+    panel.classList.remove("collapsed");
+    body.style.maxHeight = body.scrollHeight + "px";
+  } else {
+    body.style.maxHeight = body.scrollHeight + "px";
+    requestAnimationFrame(() => panel.classList.add("collapsed"));
+  }
+}
+
+document.getElementById("tabs").addEventListener("click", e => {
+  const tab = e.target.closest(".tab");
+  if (!tab) return;
+  document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+  tab.classList.add("active");
+  activeTab = tab.dataset.cat;
+  renderPanels();
+});
+
+initDateSelector();
+</script>
+</body>
+</html>

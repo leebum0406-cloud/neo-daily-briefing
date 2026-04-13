@@ -14,10 +14,26 @@ NAVER_CLIENT_SECRET = os.environ.get("NAVER_CLIENT_SECRET")
 
 # 검색 키워드 설정
 SEARCH_TOPICS = {
-    "🚇 철도/교통 정책": ["철도 정책", "GTX 개통", "지하철 노선", "신분당선", "철도 안전"],
+    "🚇 철도/교통 정책": [
+        # 국내 철도 노선/정책
+        "철도 정책", "철도 노선", "철도 건설", "철도 개통", "철도 안전",
+        # GTX / 수도권 광역철도
+        "GTX", "GTX-A", "GTX-B", "GTX-C", "GTX-D", "광역급행철도",
+        # 지하철
+        "지하철 노선", "지하철 연장", "지하철 개통", "서울 지하철", "수도권 지하철",
+        "부산 지하철", "대구 지하철", "인천 지하철", "광주 지하철", "대전 지하철",
+        # 개별 노선
+        "신분당선", "신안산선", "수서광주선", "동북선", "면목선", "목동선",
+        # 일반철도/KTX/SRT
+        "KTX", "SRT", "고속철도", "ITX", "무궁화호",
+        # 트램/경전철
+        "트램", "경전철", "도시철도",
+        # 운영/정책 기관
+        "코레일", "SR", "철도공단", "서울교통공사", "국토부 철도",
+    ],
     "🏢 국내 경제/산업": ["한국 경제", "산업 동향", "수출 무역", "제조업", "반도체 산업"],
     "🤖 AI/테크": ["인공지능 AI", "챗GPT", "AI 로봇", "딥러닝", "AI 반도체"],
-    "🌏 글로벌 철도": ["해외 철도", "고속철도", "철도 기술", "자율주행 열차"],
+    "🌏 글로벌 철도": ["해외 철도", "고속철도 해외", "철도 기술", "자율주행 열차", "유럽 철도", "일본 철도", "중국 철도"],
 }
 
 PAPER_FEEDS = [
@@ -99,7 +115,7 @@ def main():
         all_news = []
         for kw in keywords: all_news.extend(search_naver_news(kw))
         unique_news = {n['title']: n for n in all_news}.values()
-        unique_news = list(unique_news)[:5]
+        unique_news = list(unique_news)[:10]
         
         summary = summarize_section(topic, unique_news)
         final_report += f"### {topic}\n{summary}\n\n"

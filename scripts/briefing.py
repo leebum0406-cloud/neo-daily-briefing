@@ -85,7 +85,7 @@ def send_kakao(today_display, kakao_sections):
         return
 
     # 본문 텍스트 구성
-    lines = [f"🚅 {today_display} 네오트랜스 브리핑", ""]
+    lines = [""]
     for sec in kakao_sections:
         lines.append(f"{sec['topic']}")
         for hl in sec["headlines"][:3]:
@@ -97,7 +97,7 @@ def send_kakao(today_display, kakao_sections):
     template = {
         "object_type": "feed",
         "content": {
-            "title":        f"🚅 {today_display} 네오트랜스 브리핑",
+            "title":        f"{today_display}",
             "description":  body_text,
             "image_url":    f"{DASHBOARD_URL}og-image-v2.png?v={datetime.now().strftime('%Y%m%d')}",
             "image_width":  1200,

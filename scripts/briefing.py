@@ -28,13 +28,50 @@ SEARCH_TOPICS = {
     ],
     "🏢 국내 경제/산업": ["한국 경제", "산업 동향", "수출 무역", "제조업", "반도체 산업"],
     "🤖 AI/테크": ["인공지능 AI", "챗GPT", "AI 로봇", "딥러닝", "AI 반도체"],
-    "🌏 글로벌 철도": ["해외 철도", "고속철도 해외", "철도 기술", "자율주행 열차", "유럽 철도", "일본 철도", "중국 철도"],
+    "🌏 글로벌 철도": [
+        # 유럽
+        "유럽 철도", "독일 철도", "프랑스 철도", "영국 철도", "유럽 고속철도",
+        "TGV", "ICE 열차", "유로스타", "야간열차 유럽",
+        # 아시아
+        "일본 철도", "신칸센", "중국 철도", "중국 고속철도", "인도 철도",
+        "동남아 철도", "베트남 철도", "인도네시아 철도",
+        # 중동/아프리카
+        "사우디 철도", "사우디 네옴 철도", "UAE 철도", "중동 철도",
+        "아프리카 철도", "이집트 철도",
+        # 미주
+        "미국 철도", "암트랙", "남미 철도", "브라질 철도",
+        # 글로벌 기술/트렌드
+        "해외 철도 수주", "철도 수출", "자율주행 열차", "수소 열차", "초고속 철도",
+        "하이퍼루프", "철도 기술 혁신",
+    ],
 }
 
 PAPER_FEEDS = [
-    "https://export.arxiv.org/rss/cs.AI",
-    "https://export.arxiv.org/rss/cs.RO",
-    "https://export.arxiv.org/rss/eess.SY",
+    # AI / 머신러닝
+    "https://export.arxiv.org/rss/cs.AI",       # 인공지능
+    "https://export.arxiv.org/rss/cs.LG",       # 머신러닝
+    "https://export.arxiv.org/rss/cs.CV",       # 컴퓨터 비전
+    "https://export.arxiv.org/rss/cs.RO",       # 로보틱스
+    # 시스템/제어 (철도 제어시스템 관련)
+    "https://export.arxiv.org/rss/eess.SY",     # 시스템 및 제어
+    "https://export.arxiv.org/rss/eess.SP",     # 신호처리
+    # 전기/에너지 (전기철도 관련)
+    "https://export.arxiv.org/rss/eess.EE",     # 전기공학
+    # 물리/교통
+    "https://export.arxiv.org/rss/physics.soc-ph",  # 사회물리학 (교통망 포함)
+]
+
+# 논문 필터링 키워드 (철도/교통/AI 관련 논문만 선별)
+PAPER_KEYWORDS = [
+    # 철도/교통
+    "railway", "railroad", "metro", "train", "transit", "transportation",
+    "autonomous vehicle", "traffic", "rail",
+    # AI/테크
+    "large language model", "LLM", "reinforcement learning", "deep learning",
+    "neural network", "transformer", "autonomous", "robot",
+    # 전기/에너지
+    "electric vehicle", "battery", "power grid", "energy storage",
+    "electric motor", "charging",
 ]
 
 
@@ -172,19 +209,35 @@ def search_naver_news(keyword, display=3):
     return items
 
 
-def fetch_papers(count=4):
+def fetch_papers(count=6):
     items = []
+    seen = set()
     for url in PAPER_FEEDS:
         try:
             feed = feedparser.parse(url)
-            for entry in feed.entries[:2]:
-                items.append({
-                    "title":   entry.get("title", "").strip(),
-                    "link":    entry.get("link", "").strip(),
-                    "summary": entry.get("summary", "")[:400].strip(),
-                })
+            for entry in feed.entries[:5]:
+                title   = entry.get("title", "").strip()
+                summary = entry.get("summary", "")[:400].strip()
+                link    = entry.get("link", "").strip()
+
+                if title in seen:
+                    continue
+
+                # 관련 키워드 포함 논문만 선별
+                text = (title + " " + summary).lower()
+                if any(kw.lower() in text for kw in PAPER_KEYWORDS):
+                    seen.add(title)
+                    items.append({
+                        "title":   title,
+                        "link":    link,
+                        "summary": summary,
+                    })
+                    if len(items) >= count:
+                        break
         except:
             pass
+        if len(items) >= count:
+            break
     return items[:count]
 
 
